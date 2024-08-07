@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -123,9 +124,48 @@ func connect(reader *bufio.Reader, conn net.Conn) (err error) {
 		return fmt.Errorf("read port failed:%w", err)
 	}
 	port := binary.BigEndian.Uint16(buf[:2])
-
+	// 建立网络连接
+	dest, err := net.Dial("tcp", fmt.Sprintf("%v:%v", addr, port))
+	if err != nil {
+		// %w返回原始错误
+		return fmt.Errorf("dial dst failed:%w", err)
+	}
+	defer dest.Close()
+	// 打印一下从包中解析出来的 addr，port
 	log.Println("dial", addr, port)
 
+	// +----+-----+-------+------+----------+----------+
+	// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+	// +----+-----+-------+------+----------+----------+
+	// | 1  |  1  | X'00' |  1   | Variable |    2     |
+	// +----+-----+-------+------+----------+----------+
+	// VER socks版本，这里为0x05
+	// REP Relay field,内容取值如下 X’00’ succeeded
+	// RSV 保留字段
+	// ATYPE 地址类型
+	// BND.ADDR 服务绑定的地址
+	// BND.PORT 服务绑定的端口DST.PORT
+	// 发送初始数据包
+	_, err = conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+	if err != nil {
+		return fmt.Errorf("write failed: %w", err)
+	}
+	//创建上下文和取消函数
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // 确保函数退出时清理上下文
+
+	go func() {
+		// 实现一个单向数据转发
+		_, _ = io.Copy(dest, reader) // reader->dest
+		cancel()
+	}()
+	go func() {
+		_, _ = io.Copy(conn, dest) // dest->conn
+		cancel()
+	}()
+
+	// 阻塞等待上下文完成
+	<-ctx.Done()
 	return nil
 }
 
