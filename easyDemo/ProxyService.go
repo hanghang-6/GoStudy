@@ -57,6 +57,8 @@ func auth(reader *bufio.Reader, conn net.Conn) (err error) {
 	// +----+--------+
 	// | 1  |   1    |
 	// +----+--------+
+
+	// 认证响应   写入比特流是TCP中常见的通信方式
 	_, err = conn.Write([]byte{socks5Ver, 0x00}) // 0x00代表不需要验证
 	if err != nil {
 		return fmt.Errorf("write failed:%w", err)
@@ -81,6 +83,7 @@ func connect(reader *bufio.Reader, conn net.Conn) (err error) {
 
 	// 大小为4byte的buffer
 	buf := make([]byte, 4)
+	// ReadFull函数 读满 buf 才罢手
 	_, err = io.ReadFull(reader, buf)
 	if err != nil {
 		return fmt.Errorf("read header failed:%w", err)
@@ -103,6 +106,7 @@ func connect(reader *bufio.Reader, conn net.Conn) (err error) {
 		}
 		addr = fmt.Sprintf("%d.%d.%d.%d", buf[0], buf[1], buf[2], buf[3])
 	case atypeHOST:
+		// 协议构成： 如果atypehost 那么 下一个字段的第一个byte存放 hostSize字段用于存放host长度  这是能直接读出来的
 		hostSize, err := reader.ReadByte()
 		if err != nil {
 			return fmt.Errorf("read hostSize failed:%w", err)
@@ -123,7 +127,7 @@ func connect(reader *bufio.Reader, conn net.Conn) (err error) {
 	if err != nil {
 		return fmt.Errorf("read port failed:%w", err)
 	}
-	port := binary.BigEndian.Uint16(buf[:2])
+	port := binary.BigEndian.Uint16(buf[:2]) // 大端 . 无符号整数
 	// 建立网络连接
 	dest, err := net.Dial("tcp", fmt.Sprintf("%v:%v", addr, port))
 	if err != nil {
@@ -156,15 +160,15 @@ func connect(reader *bufio.Reader, conn net.Conn) (err error) {
 
 	go func() {
 		// 实现一个单向数据转发
-		_, _ = io.Copy(dest, reader) // reader->dest
+		_, _ = io.Copy(dest, reader) // client->proxy->dest
 		cancel()
 	}()
 	go func() {
-		_, _ = io.Copy(conn, dest) // dest->conn
+		_, _ = io.Copy(conn, dest) // dest->proxy->client
 		cancel()
 	}()
 
-	// 阻塞等待上下文完成
+	// 阻塞等待上下文完成   只要有一个方向的发送完成了就可以了，一次请求和产生的响应，可以看作两个单向数据流
 	<-ctx.Done()
 	return nil
 }
@@ -173,6 +177,7 @@ func process(conn net.Conn) {
 	// 记得关闭连接
 	defer conn.Close()
 	// 带缓冲的 只读流  带缓冲的流可以减少底层系统调用的次数
+	// 可以从conn（转发服务器和client的TCP连接） 中读取字节流
 	reader := bufio.NewReader(conn)
 	err := auth(reader, conn)
 	if err != nil {
@@ -181,23 +186,26 @@ func process(conn net.Conn) {
 	}
 	err = connect(reader, conn)
 	if err != nil {
-		log.Printf("client %v auth failed: %v", conn.RemoteAddr(), err)
+		log.Printf("client %v connect failed: %v", conn.RemoteAddr(), err)
 		return
 	}
 }
 func main() {
+	// 在1080上创建tcp服务器
 	server, err := net.Listen("tcp", "127.0.0.1:1080")
 
 	if err != nil {
 		panic(err)
 	}
 	for {
+		// 接受传入的连接请求
 		client, err := server.Accept()
 		if err != nil {
 			log.Printf("Accept err:%v\n", err)
 			continue
 		}
 		//轻松高并发
+		// 处理某一个客户端的连接请求  （同一时刻可能有多个客户端连接请求  故  进行并发处理）
 		go process(client)
 	}
 }
