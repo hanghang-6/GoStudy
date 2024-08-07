@@ -10,7 +10,8 @@ func UserInput() (guess int, yes bool) {
 	fmt.Println("请输入你猜的数字")
 	// Scanf 简化代码实现
 	// 但如果用户输入的非int 会 输出多次异常提示
-	_, err := fmt.Scanf("%d", &guess)
+	// 用Scan 不读入换行符
+	_, err := fmt.Scan(&guess)
 	if err != nil {
 		fmt.Println("非法输入，你输入的不是一个int")
 		yes = false
