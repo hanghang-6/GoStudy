@@ -1,26 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"math/rand"
-	"os"
-	"strconv"
-	"strings"
 )
 
 func UserInput() (guess int, yes bool) {
 	yes = true
 	fmt.Println("请输入你猜的数字")
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("读输入 发生错误")
-		yes = false
-	}
-	input = strings.Replace(input, "\n", "", -1)
-	// input = strings.TrimSuffix(input,"\n")
-	guess, err = strconv.Atoi(input)
+	// Scanf 简化代码实现
+	// 但如果用户输入的非int 会 输出多次异常提示
+	_, err := fmt.Scanf("%d", &guess)
 	if err != nil {
 		fmt.Println("非法输入，你输入的不是一个int")
 		yes = false
