@@ -1,0 +1,49 @@
+svr_config:
+    name: "videosvr"
+    host: "43.139.192.217"
+    port: 8004
+    relation_svr_name: "relationsvr"
+    favorite_svr_name: "favoritesvr"
+    machine_id: 1
+
+redis:
+  host: "43.139.192.217"
+  password: ""
+  db: 0
+  port: 6379
+  PoolSize: 10
+
+mysql:
+  host: "43.139.192.217"
+  port: "8086"
+  database: "camps_tiktok"
+  username: "root"
+  password: "123456"
+  max_idle_conn: 10
+  max_open_conn: 100
+  max_idle_time: 30
+
+log:
+  level: "debug"
+  file_name: "video.log"
+  log_path: "../../log/videosvr/"
+  max_size: 200
+  max_age: 30
+  max_backups: 7
+
+consul:
+  host: "43.139.192.217"
+  port: 8500
+  tags:
+    - "videosvr"
+
+minio:
+  host: "43.139.192.217"
+  port: "9000"
+  access_key_id: "lsVmcz8Ahat4GoMP39y0"
+  secret_access_key: "PSThm9hSaHUNQ2xoItGji4IBIzD3JhJQfrt3kecG"
+  video_buckets: video
+  pic_buckets: pic
+  video_path: "/root/tiktok/video"
+  pic_path: "/root/tiktok/pic"
+
